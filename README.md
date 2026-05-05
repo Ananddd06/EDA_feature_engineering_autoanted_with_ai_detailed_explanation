@@ -41,9 +41,11 @@ Upload a CSV and get:
 - Univariate + multivariate visual analysis
 - Outlier treatment (IQR / Z-score + cap/remove logic)
 - Categorical encoding strategies
-- Numeric scaling strategies
+- Model-training-aware preprocessing guidance (scaling deferred to training)
 - Feature engineering and correlated-feature removal
 - Target-aware split with stratification fallback where possible
+- End-to-end post-cleaning model training, evaluation, cross-validation, and tuning
+- User-adjustable model validation controls (CV folds and tuning iterations)
 - OpenRouter-based AI explanations and auto-configuration support
 
 ---
@@ -109,11 +111,15 @@ Recommended:
 streamlit run preprocessing_agent.py
 ```
 
+> `preprocessing_agent.py` includes the full pipeline with end-to-end model training.
+
 Alternate:
 
 ```bash
 streamlit run app.py
 ```
+
+> `app.py` is a preprocessing-focused variant and does not include the model training stage.
 
 Open the URL shown by Streamlit (typically `http://localhost:8501`).
 
@@ -142,7 +148,7 @@ The primary app (`preprocessing_agent.py`) executes a rich preprocessing + EDA f
    Correlation heatmap, scatter/pair plots, categorical interactions.
 
 7. **Feature transformation**  
-   Skew handling (log-style transformations), scaling, categorical encoding strategy.
+   Skew handling (log-style transformations) and categorical encoding strategy.
 
 8. **Feature engineering**  
    Correlation diagnostics and zero-variance feature checks.
@@ -151,7 +157,10 @@ The primary app (`preprocessing_agent.py`) executes a rich preprocessing + EDA f
    Drops highly correlated features above threshold.
 
 10. **Train/test split + export**  
-    Stratified split when target allows; otherwise random split. Exports cleaned CSV + generated Python script.
+     Stratified split when target allows; otherwise random split. Exports cleaned CSV + generated Python script.
+
+11. **Post-cleaning model development**  
+    Automatically detects classification/regression, runs multi-model training, CV, hyperparameter tuning, and final test-set evaluation with diagnostics.
 
 ---
 
@@ -224,7 +233,6 @@ You pass structured context (`pretty_json(...)`, counts, shapes, config choices)
   - `outlier_action`
   - `z_threshold`
   - `iqr_factor`
-  - `scaling_method`
   - `encoding_method`
   - `test_size`
   - `max_onehot_unique`

@@ -21,8 +21,6 @@ from scipy import stats
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import (
     LabelEncoder,
-    MinMaxScaler,
-    StandardScaler,
 )
 
 warnings.filterwarnings("ignore")
@@ -281,11 +279,15 @@ st.markdown("""
   <div class="hero-badge">ML PREPROCESSING AGENT · OPENROUTER-POWERED</div>
   <h1 class="hero-title">🧬 Data Preprocessing Pipeline</h1>
   <p class="hero-sub">
-    Upload any CSV — the agent runs a full 10-step ML preprocessing pipeline,
+    Upload any CSV — the agent runs a full 9-step ML preprocessing pipeline,
     explains every decision with AI, and exports a cleaned dataset.
   </p>
 </div>
 """, unsafe_allow_html=True)
+st.info(
+    "ℹ️ This `app.py` flow includes preprocessing only. "
+    "For end-to-end model training (Step 13), run: `streamlit run preprocessing_agent.py`."
+)
 
 # ─────────────────────────────────────────────────────────
 # SIDEBAR — settings
@@ -302,7 +304,6 @@ with st.sidebar:
     outlier_action = st.selectbox("Outlier action", ["Cap (clip)", "Remove rows"], index=0)
     z_threshold = st.slider("Z-score threshold", 2.0, 4.0, 3.0, 0.1) if outlier_method == "Z-score" else 3.0
     iqr_factor = st.slider("IQR multiplier", 1.0, 3.0, 1.5, 0.25) if outlier_method == "IQR" else 1.5
-    scaling_method = st.selectbox("Scaling method", ["StandardScaler", "MinMaxScaler", "Both"], index=0)
     encoding_method = st.selectbox("Categorical encoding", ["One-Hot Encoding", "Label Encoding", "Both"], index=0)
     test_size = st.slider("Test split size", 0.10, 0.40, 0.20, 0.05)
     max_onehot_unique = st.slider("Max unique values for one-hot", 2, 30, 10, 1)
@@ -338,7 +339,7 @@ if uploaded_file is None:
     <div class="step-card">
       <h4>How it works</h4>
       <p>
-        Upload a CSV → The agent runs all 10 preprocessing steps automatically →
+        Upload a CSV → The agent runs all 9 preprocessing steps automatically →
         Get AI explanations for every decision → Download the clean dataset.
       </p>
     </div>
@@ -350,14 +351,13 @@ if uploaded_file is None:
         ("2", "Missing Values", "smart fill or drop with strategy"),
         ("3", "Duplicate Removal", "detect and drop exact duplicates"),
         ("4", "Categorical Encoding", "label encoding + one-hot encoding"),
-        ("5", "Feature Scaling", "StandardScaler / MinMaxScaler"),
+        ("5", "Outlier Detection", "IQR or Z-score with cap/remove"),
     ]
     steps_right = [
-        ("6", "Outlier Detection", "IQR or Z-score with cap/remove"),
-        ("7", "Feature Engineering", "correlation heatmap + drop low-variance"),
-        ("8", "Feature Selection", "remove highly correlated features"),
-        ("9", "Train/Test Split", "stratify-aware split with summary"),
-        ("10", "Export", "download cleaned CSV + code snippet"),
+        ("6", "Feature Engineering", "correlation heatmap + drop low-variance"),
+        ("7", "Feature Selection", "remove highly correlated features"),
+        ("8", "Train/Test Split", "stratify-aware split with summary"),
+        ("9", "Export", "download cleaned CSV + code snippet"),
     ]
     for num, title, desc in steps_left:
         cols[0].markdown(
@@ -577,85 +577,10 @@ else:
 
 
 # ─────────────────────────────────────────────────────────
-# STEP 5 — Feature Scaling
+# STEP 5 — Outlier Detection & Handling
 # ─────────────────────────────────────────────────────────
 st.markdown('<hr class="soft-divider">', unsafe_allow_html=True)
-section("Step 5 — Feature Scaling", "📏")
-
-num_cols = df.select_dtypes(include="number").columns.tolist()
-bool_cols = [c for c in num_cols if df[c].nunique() <= 2]
-scale_cols = [c for c in num_cols if c not in bool_cols]
-
-if not scale_cols:
-    st.warning("No numeric columns with >2 unique values found to scale.")
-else:
-    st.markdown(f"**Scaling {len(scale_cols)} numeric columns** (skipping {len(bool_cols)} binary columns)")
-
-    df_before_scale = df[scale_cols].copy()
-
-    if scaling_method in ("StandardScaler", "Both"):
-        ss = StandardScaler()
-        scaled_vals = ss.fit_transform(df[scale_cols])
-        df_std = pd.DataFrame(scaled_vals, columns=[f"{c}_std" for c in scale_cols], index=df.index)
-
-    if scaling_method in ("MinMaxScaler", "Both"):
-        mms = MinMaxScaler()
-        scaled_vals = mms.fit_transform(df[scale_cols])
-        df_mm = pd.DataFrame(scaled_vals, columns=[f"{c}_mm" for c in scale_cols], index=df.index)
-
-    # Apply chosen scaler to original df
-    if scaling_method == "StandardScaler":
-        df[scale_cols] = scaled_vals  # already done above
-        df[scale_cols] = ss.transform(df_before_scale) if scaling_method == "StandardScaler" else df[scale_cols]
-        ss2 = StandardScaler()
-        df[scale_cols] = ss2.fit_transform(df[scale_cols])
-    elif scaling_method == "MinMaxScaler":
-        mms2 = MinMaxScaler()
-        df[scale_cols] = mms2.fit_transform(df[scale_cols])
-    else:
-        ss2 = StandardScaler()
-        df[scale_cols] = ss2.fit_transform(df[scale_cols])
-
-    # Side-by-side distribution comparison (first 3 cols)
-    show_cols = scale_cols[:3]
-    if show_cols:
-        fig, axes = plt.subplots(2, len(show_cols), figsize=(4 * len(show_cols), 6))
-        if len(show_cols) == 1:
-            axes = np.array(axes).reshape(2, 1)
-        fig.patch.set_facecolor("#0d1321")
-        for i, col in enumerate(show_cols):
-            for row, (data, title) in enumerate([
-                (df_before_scale[col], f"{col}\n(before)"),
-                (df[col], f"{col}\n(after)"),
-            ]):
-                ax = axes[row][i]
-                ax.set_facecolor("#13161f")
-                clean_data = data.dropna().values
-                bins = np.linspace(clean_data.min(), clean_data.max(), 31)
-                counts, _ = np.histogram(clean_data, bins=bins)
-                ax.stairs(counts, bins, color="#63b3ed" if row == 0 else "#68d391", fill=True, alpha=0.85)
-                ax.set_title(title, color="#e2e8f0", fontsize=9)
-                ax.tick_params(colors="#718096", labelsize=7)
-                for spine in ax.spines.values():
-                    spine.set_edgecolor("#1e2335")
-        fig.suptitle(f"Feature Distributions — {scaling_method}", color="#a0aec0", fontsize=11, y=1.01)
-        fig.tight_layout()
-        st.image(fig_to_buf(fig))
-
-    ai_step5 = ask_deepseek(
-        "You are a senior ML engineer. Explain StandardScaler vs MinMaxScaler with formulas, "
-        "when to use each (e.g. SVM vs neural nets vs tree-based), and common mistakes. "
-        "5–6 bullet points, interview-ready.",
-        f"Scaling method applied: {scaling_method}. Columns scaled: {len(scale_cols)}",
-    )
-    st.markdown(f'<div class="ai-label">🤖 AI EXPLANATION</div><div class="ai-insight">{ai_step5}</div>', unsafe_allow_html=True)
-
-
-# ─────────────────────────────────────────────────────────
-# STEP 6 — Outlier Detection & Handling
-# ─────────────────────────────────────────────────────────
-st.markdown('<hr class="soft-divider">', unsafe_allow_html=True)
-section("Step 6 — Detecting & Handling Outliers", "🎯")
+section("Step 5 — Detecting & Handling Outliers", "🎯")
 
 num_cols_now = df.select_dtypes(include="number").columns.tolist()
 outlier_log = {}
@@ -721,20 +646,20 @@ if outlier_log:
 else:
     st.success("✅ No significant outliers detected.")
 
-ai_step6 = ask_deepseek(
+ai_step5 = ask_deepseek(
     "You are a senior ML engineer. Explain IQR vs Z-score outlier detection with formulas, "
     "when to cap vs remove outliers, and their effect on different ML algorithms. "
     "5–6 bullet points, practical and interview-ready.",
     f"Method: {outlier_method}. Action: {outlier_action}. Columns affected: {len(outlier_log)}",
 )
-st.markdown(f'<div class="ai-label">🤖 AI EXPLANATION</div><div class="ai-insight">{ai_step6}</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="ai-label">🤖 AI EXPLANATION</div><div class="ai-insight">{ai_step5}</div>', unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────────────────
-# STEP 7 — Feature Engineering
+# STEP 6 — Feature Engineering
 # ─────────────────────────────────────────────────────────
 st.markdown('<hr class="soft-divider">', unsafe_allow_html=True)
-section("Step 7 — Feature Engineering", "⚙️")
+section("Step 6 — Feature Engineering", "⚙️")
 
 num_cols_fe = df.select_dtypes(include="number").columns.tolist()
 
@@ -772,21 +697,21 @@ if low_var:
 else:
     st.markdown('<span class="badge-green">No zero-variance columns found</span>', unsafe_allow_html=True)
 
-ai_step7 = ask_deepseek(
+ai_step6 = ask_deepseek(
     "You are a senior ML engineer. Explain what feature engineering involves, "
     "why correlation analysis matters, and what zero-variance features are. "
     "Also explain the risks of highly correlated features (multicollinearity). "
     "5 bullet points, interview-ready.",
     f"Numeric features: {len(num_cols_fe)}. Zero-variance dropped: {len(low_var)}",
 )
-st.markdown(f'<div class="ai-label">🤖 AI EXPLANATION</div><div class="ai-insight">{ai_step7}</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="ai-label">🤖 AI EXPLANATION</div><div class="ai-insight">{ai_step6}</div>', unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────────────────
-# STEP 8 — Feature Selection (drop highly correlated)
+# STEP 7 — Feature Selection (drop highly correlated)
 # ─────────────────────────────────────────────────────────
 st.markdown('<hr class="soft-divider">', unsafe_allow_html=True)
-section("Step 8 — Feature Selection (Remove Highly Correlated)", "🔬")
+section("Step 7 — Feature Selection (Remove Highly Correlated)", "🔬")
 
 num_cols_fs = df.select_dtypes(include="number").columns.tolist()
 dropped_corr = []
@@ -810,20 +735,20 @@ col1, col2 = st.columns(2)
 col1.metric("Columns before selection", len(num_cols_fs))
 col2.metric("Columns after selection", df.shape[1])
 
-ai_step8 = ask_deepseek(
+ai_step7 = ask_deepseek(
     "You are a senior ML engineer. Explain feature selection techniques (filter, wrapper, embedded), "
     "why removing highly correlated features improves model performance, "
     "and mention Variance Inflation Factor (VIF). 5 bullet points, interview-ready.",
     f"Features before: {len(num_cols_fs)}. Dropped for high correlation (>0.95): {len(dropped_corr)}",
 )
-st.markdown(f'<div class="ai-label">🤖 AI EXPLANATION</div><div class="ai-insight">{ai_step8}</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="ai-label">🤖 AI EXPLANATION</div><div class="ai-insight">{ai_step7}</div>', unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────────────────
-# STEP 9 — Train / Test Split
+# STEP 8 — Train / Test Split
 # ─────────────────────────────────────────────────────────
 st.markdown('<hr class="soft-divider">', unsafe_allow_html=True)
-section("Step 9 — Train / Test Split", "✂️")
+section("Step 8 — Train / Test Split", "✂️")
 
 n_total = len(df)
 n_test = int(n_total * test_size)
@@ -854,20 +779,20 @@ ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.35), ncol=2,
 fig.tight_layout()
 st.image(fig_to_buf(fig))
 
-ai_step9 = ask_deepseek(
+ai_step8 = ask_deepseek(
     "You are a senior ML engineer. Explain train/test split best practices: "
     "why 80/20, stratified split, data leakage risks, and cross-validation. "
     "5 bullet points, interview-ready.",
     f"Split: {100*(1-test_size):.0f}/{100*test_size:.0f}. Train: {len(train_df)}, Test: {len(test_df)}",
 )
-st.markdown(f'<div class="ai-label">🤖 AI EXPLANATION</div><div class="ai-insight">{ai_step9}</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="ai-label">🤖 AI EXPLANATION</div><div class="ai-insight">{ai_step8}</div>', unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────────────────
-# STEP 10 — Export cleaned dataset
+# STEP 9 — Export cleaned dataset
 # ─────────────────────────────────────────────────────────
 st.markdown('<hr class="soft-divider">', unsafe_allow_html=True)
-section("Step 10 — Export Cleaned Dataset", "💾")
+section("Step 9 — Export Cleaned Dataset", "💾")
 
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Original rows", f"{raw_df.shape[0]:,}")
@@ -898,7 +823,7 @@ Generated: {datetime.now().strftime("%Y-%m-%d %H:%M")}
 
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler, MinMaxScaler, LabelEncoder
+from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 from scipy import stats
 
@@ -930,18 +855,13 @@ for col in cat_cols:
         le = LabelEncoder()
         df[col] = le.fit_transform(df[col].astype(str))
 
-# 5. Scale numerics
-num_cols = df.select_dtypes(include="number").columns
-scaler = StandardScaler()  # or MinMaxScaler()
-df[num_cols] = scaler.fit_transform(df[num_cols])
-
-# 6. Outliers — IQR cap
+# 5. Outliers — IQR cap
 for col in df.select_dtypes(include="number").columns:
     Q1, Q3 = df[col].quantile(0.25), df[col].quantile(0.75)
     IQR = Q3 - Q1
     df[col] = df[col].clip(Q1 - {iqr_factor}*IQR, Q3 + {iqr_factor}*IQR)
 
-# 7–8. Drop zero-variance & highly correlated
+# 6–7. Drop zero-variance & highly correlated
 from sklearn.feature_selection import VarianceThreshold
 vt = VarianceThreshold(threshold=0.0)
 vt.fit(df)
@@ -952,11 +872,11 @@ upper = corr.where(np.triu(np.ones(corr.shape), k=1).astype(bool))
 to_drop = [c for c in upper.columns if any(upper[c] > 0.95)]
 df.drop(columns=to_drop, inplace=True)
 
-# 9. Train/Test split
+# 8. Train/Test split
 train_df, test_df = train_test_split(df, test_size={test_size}, random_state=42)
 print(f"Train: {{len(train_df)}} | Test: {{len(test_df)}}")
 
-# 10. Save
+# 9. Save
 df.to_csv("cleaned_dataset.csv", index=False)
 print("Saved cleaned_dataset.csv")
 '''
@@ -983,7 +903,6 @@ ai_final = ask_deepseek(
     - Missing strategy: {missing_strategy}
     - Outlier method: {outlier_method} ({outlier_action})
     - Encoding: {encoding_method}
-    - Scaling: {scaling_method}
     - Test split: {int(test_size*100)}%
     """,
     max_tokens=1200,
