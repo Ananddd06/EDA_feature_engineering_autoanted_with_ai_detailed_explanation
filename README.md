@@ -1,4 +1,4 @@
-# 🚀 AI-Powered Automated EDA, Feature Engineering & ML Pipeline Agent
+# 🚀 AI-Powered Automated EDA, Feature Engineering 
 
 <div align="center">
 
