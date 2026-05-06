@@ -11,6 +11,7 @@ import warnings
 import html
 import re
 import difflib
+import pickle
 from collections import Counter
 from typing import Optional
 from datetime import datetime
@@ -25,6 +26,8 @@ from openai import OpenAI
 from scipy import stats
 from sklearn.base import clone
 from sklearn.ensemble import (
+    ExtraTreesClassifier,
+    ExtraTreesRegressor,
     GradientBoostingClassifier,
     GradientBoostingRegressor,
     RandomForestClassifier,
@@ -55,6 +58,7 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import (
     ParameterSampler,
+    RandomizedSearchCV,
     cross_val_score,
     learning_curve,
     train_test_split,
@@ -94,6 +98,14 @@ except ImportError:
     LGBMClassifier = None
     LGBMRegressor = None
     LIGHTGBM_AVAILABLE = False
+
+try:
+    from catboost import CatBoostClassifier, CatBoostRegressor
+    CATBOOST_AVAILABLE = True
+except ImportError:
+    CatBoostClassifier = None
+    CatBoostRegressor = None
+    CATBOOST_AVAILABLE = False
 
 warnings.filterwarnings("ignore")
 load_dotenv()
@@ -603,6 +615,16 @@ def build_model_pipeline(estimator, scaler_name: str, use_scaler: bool, use_smot
     return Pipeline(steps=steps)
 
 
+def choose_scaler_name(X_train: pd.DataFrame) -> str:
+    num_cols = X_train.select_dtypes(include=["number"]).columns.tolist()
+    if not num_cols:
+        return "StandardScaler"
+    skew_values = X_train[num_cols].skew(numeric_only=True).abs().replace([np.inf, -np.inf], np.nan).dropna()
+    if skew_values.empty:
+        return "StandardScaler"
+    return "MinMaxScaler" if float(skew_values.median()) > 1.0 else "StandardScaler"
+
+
 def get_model_registry(problem_type: str):
     if problem_type == "classification":
         models = {
@@ -611,38 +633,10 @@ def get_model_registry(problem_type: str):
                 "use_scaler": True,
                 "params": {
                     "model__C": [0.01, 0.1, 1.0, 10.0],
-                    "model__solver": ["lbfgs", "liblinear"],
+                    "model__solver": ["lbfgs", "liblinear", "saga"],
                 },
             },
-            "K-Nearest Neighbors": {
-                "estimator": KNeighborsClassifier(),
-                "use_scaler": True,
-                "params": {
-                    "model__n_neighbors": [3, 5, 7, 9, 11, 15, 21],
-                    "model__weights": ["uniform", "distance"],
-                    "model__p": [1, 2],
-                },
-            },
-            "Stochastic Gradient Descent (Classifier)": {
-                "estimator": SGDClassifier(
-                    loss="log_loss",
-                    early_stopping=True,
-                    validation_fraction=0.1,
-                    n_iter_no_change=8,
-                    random_state=42,
-                ),
-                "use_scaler": True,
-                "params": {
-                    "model__loss": ["log_loss", "modified_huber"],
-                    "model__alpha": [1e-5, 1e-4, 1e-3, 1e-2],
-                    "model__penalty": ["l2", "l1", "elasticnet"],
-                    "model__l1_ratio": [0.15, 0.5, 0.85],
-                    "model__learning_rate": ["optimal", "adaptive"],
-                    "model__eta0": [0.001, 0.01, 0.1],
-                    "model__max_iter": [1000, 2000, 3000],
-                },
-            },
-            "Decision Tree": {
+            "Decision Tree Classifier": {
                 "estimator": DecisionTreeClassifier(random_state=42),
                 "use_scaler": False,
                 "params": {
@@ -651,7 +645,7 @@ def get_model_registry(problem_type: str):
                     "model__min_samples_leaf": [1, 2, 4],
                 },
             },
-            "Random Forest": {
+            "Random Forest Classifier": {
                 "estimator": RandomForestClassifier(random_state=42),
                 "use_scaler": False,
                 "params": {
@@ -661,7 +655,7 @@ def get_model_registry(problem_type: str):
                     "model__min_samples_leaf": [1, 2, 4],
                 },
             },
-            "Gradient Boosting": {
+            "Gradient Boosting Classifier": {
                 "estimator": GradientBoostingClassifier(random_state=42),
                 "use_scaler": False,
                 "params": {
@@ -670,14 +664,28 @@ def get_model_registry(problem_type: str):
                     "model__max_depth": [2, 3, 4],
                 },
             },
-            "Naive Bayes": {
-                "estimator": GaussianNB(),
+            "K-Nearest Neighbors (KNN)": {
+                "estimator": KNeighborsClassifier(),
                 "use_scaler": True,
-                "params": {"model__var_smoothing": np.logspace(-11, -7, 9)},
+                "params": {
+                    "model__n_neighbors": [3, 5, 7, 9, 11, 15, 21],
+                    "model__weights": ["uniform", "distance"],
+                    "model__p": [1, 2],
+                },
+            },
+            "Extra Trees Classifier": {
+                "estimator": ExtraTreesClassifier(random_state=42),
+                "use_scaler": False,
+                "params": {
+                    "model__n_estimators": [100, 200, 300],
+                    "model__max_depth": [None, 8, 16, 24],
+                    "model__min_samples_split": [2, 5, 10],
+                    "model__min_samples_leaf": [1, 2, 4],
+                },
             },
         }
         if XGBOOST_AVAILABLE:
-            models["XGBoost"] = {
+            models["XGBoost Classifier"] = {
                 "estimator": XGBClassifier(eval_metric="logloss", random_state=42),
                 "use_scaler": False,
                 "params": {
@@ -688,7 +696,7 @@ def get_model_registry(problem_type: str):
                 },
             }
         if LIGHTGBM_AVAILABLE:
-            models["LightGBM"] = {
+            models["LightGBM Classifier"] = {
                 "estimator": LGBMClassifier(random_state=42, verbose=-1),
                 "use_scaler": False,
                 "params": {
@@ -696,6 +704,20 @@ def get_model_registry(problem_type: str):
                     "model__num_leaves": [15, 31, 63],
                     "model__learning_rate": [0.01, 0.05, 0.1, 0.2],
                     "model__subsample": [0.8, 1.0],
+                },
+            }
+        if CATBOOST_AVAILABLE:
+            models["CatBoost Classifier"] = {
+                "estimator": CatBoostClassifier(
+                    random_state=42,
+                    verbose=0,
+                    allow_writing_files=False,
+                ),
+                "use_scaler": False,
+                "params": {
+                    "model__depth": [4, 6, 8],
+                    "model__learning_rate": [0.01, 0.05, 0.1],
+                    "model__iterations": [200, 400],
                 },
             }
         return models
@@ -706,24 +728,15 @@ def get_model_registry(problem_type: str):
             "use_scaler": True,
             "params": {},
         },
-        "Ridge": {
+        "Ridge Regression": {
             "estimator": Ridge(random_state=42),
             "use_scaler": True,
             "params": {"model__alpha": [0.01, 0.1, 1.0, 10.0, 100.0]},
         },
-        "Lasso": {
+        "Lasso Regression": {
             "estimator": Lasso(random_state=42, max_iter=5000),
             "use_scaler": True,
             "params": {"model__alpha": [0.001, 0.01, 0.1, 1.0, 10.0]},
-        },
-        "Decision Tree Regressor": {
-            "estimator": DecisionTreeRegressor(random_state=42),
-            "use_scaler": False,
-            "params": {
-                "model__max_depth": [None, 5, 10, 20],
-                "model__min_samples_split": [2, 5, 10],
-                "model__min_samples_leaf": [1, 2, 4],
-            },
         },
         "Random Forest Regressor": {
             "estimator": RandomForestRegressor(random_state=42),
@@ -744,31 +757,14 @@ def get_model_registry(problem_type: str):
                 "model__max_depth": [2, 3, 4],
             },
         },
-        "K-Nearest Neighbors Regressor": {
-            "estimator": KNeighborsRegressor(),
-            "use_scaler": True,
+        "Extra Trees Regressor": {
+            "estimator": ExtraTreesRegressor(random_state=42),
+            "use_scaler": False,
             "params": {
-                "model__n_neighbors": [3, 5, 7, 9, 11, 15, 21],
-                "model__weights": ["uniform", "distance"],
-                "model__p": [1, 2],
-            },
-        },
-        "Stochastic Gradient Descent (Regressor)": {
-            "estimator": SGDRegressor(
-                early_stopping=True,
-                validation_fraction=0.1,
-                n_iter_no_change=8,
-                random_state=42,
-            ),
-            "use_scaler": True,
-            "params": {
-                "model__loss": ["squared_error", "huber"],
-                "model__alpha": [1e-5, 1e-4, 1e-3, 1e-2],
-                "model__penalty": ["l2", "l1", "elasticnet"],
-                "model__l1_ratio": [0.15, 0.5, 0.85],
-                "model__learning_rate": ["optimal", "adaptive", "invscaling"],
-                "model__eta0": [0.001, 0.01, 0.1],
-                "model__max_iter": [1000, 2000, 3000],
+                "model__n_estimators": [100, 200, 300],
+                "model__max_depth": [None, 8, 16, 24],
+                "model__min_samples_split": [2, 5, 10],
+                "model__min_samples_leaf": [1, 2, 4],
             },
         },
     }
@@ -792,6 +788,20 @@ def get_model_registry(problem_type: str):
                 "model__num_leaves": [15, 31, 63],
                 "model__learning_rate": [0.01, 0.05, 0.1, 0.2],
                 "model__subsample": [0.8, 1.0],
+            },
+        }
+    if CATBOOST_AVAILABLE:
+        models["CatBoost Regressor"] = {
+            "estimator": CatBoostRegressor(
+                random_state=42,
+                verbose=0,
+                allow_writing_files=False,
+            ),
+            "use_scaler": False,
+            "params": {
+                "model__depth": [4, 6, 8],
+                "model__learning_rate": [0.01, 0.05, 0.1],
+                "model__iterations": [200, 400],
             },
         }
     return models
@@ -2256,9 +2266,9 @@ if len(step67_num_cols) > 1:
 
     # 2) Correlation Strength Bar Plot
     st.markdown("**2) Correlation Strength Bar Plot (avg |correlation| per feature)**")
-    corr_abs = corr_matrix.abs().copy()
-    np.fill_diagonal(corr_abs.values, np.nan)
-    corr_strength = corr_abs.mean().sort_values(ascending=False)
+    corr_abs = corr_matrix.abs()
+    diag_mask = np.eye(len(corr_abs), dtype=bool)
+    corr_strength = corr_abs.mask(diag_mask).mean().sort_values(ascending=False)
     if corr_strength.dropna().shape[0] > 0:
         fig, ax = plt.subplots(figsize=(12, 5))
         sns.barplot(x=corr_strength.index, y=corr_strength.values, ax=ax, color="#62b8ff")
@@ -2582,16 +2592,22 @@ if len(high_skew) > 0:
 st.markdown("### Step 10 — 🔤 Categorical Features (Encoding)")
 st.markdown("**Strategy:** Label Encoding (Ordinal) vs One-Hot (Nominal)")
 
-cat_cols_now = df.select_dtypes(include="object").columns.tolist()
+cat_cols_now = df.select_dtypes(include=["object", "category"]).columns.tolist()
+bool_cols_now = df.select_dtypes(include=["bool"]).columns.tolist()
 encoding_map = {}
 
+for col in bool_cols_now:
+    df[col] = df[col].astype("int8")
+    encoding_map[col] = "Boolean → 0/1"
+
 for col in cat_cols_now:
-    unique_count = df[col].nunique()
+    col_as_text = safe_categorical_series(df[col])
+    unique_count = col_as_text.nunique(dropna=True)
     
     if encoding_method == "Label Encoding":
         encoding_map[col] = "Label Encoding"
-        mapping = {k: i for i, k in enumerate(df[col].astype(str).unique())}
-        df[col] = df[col].astype(str).map(mapping)
+        mapping = {k: i for i, k in enumerate(col_as_text.dropna().unique())}
+        df[col] = col_as_text.map(mapping)
     elif encoding_method == "One-Hot Encoding":
         if unique_count <= max_onehot_unique:
             encoding_map[col] = "One-Hot Encoding"
@@ -2606,8 +2622,8 @@ for col in cat_cols_now:
         # Binary: Label Encoding
         encoding_map[col] = "Label Encoding (Binary)"
         # Apply simple map
-        mapping = {k: i for i, k in enumerate(df[col].unique())}
-        df[col] = df[col].map(mapping)
+        mapping = {k: i for i, k in enumerate(col_as_text.dropna().unique())}
+        df[col] = col_as_text.map(mapping)
         
     elif unique_count <= 10:
         # Low Cardinality: One-Hot Encoding
@@ -2622,6 +2638,38 @@ for col in cat_cols_now:
         freq = safe_value_counts(safe_categorical_series(df[col]), normalize=True)
         df[col + '_freq'] = safe_categorical_series(df[col]).map(freq)
         df.drop(columns=[col], inplace=True)
+
+# Ensure every remaining column is numeric for ML readiness.
+bool_like_values = {
+    "true": 1, "false": 0,
+    "yes": 1, "no": 0,
+    "y": 1, "n": 0,
+    "t": 1, "f": 0,
+    "1": 1, "0": 0,
+}
+remaining_non_numeric = df.select_dtypes(exclude=["number"]).columns.tolist()
+for col in remaining_non_numeric:
+    if pd.api.types.is_datetime64_any_dtype(df[col]):
+        dt_col = pd.to_datetime(df[col], errors="coerce")
+        df[col] = np.where(dt_col.notna(), dt_col.astype("int64") / 1e9, np.nan)
+        encoding_map[col] = "Datetime → Unix timestamp"
+        continue
+
+    col_as_text = safe_categorical_series(df[col])
+    normalized = col_as_text.str.strip().str.lower()
+    observed = set(normalized.dropna().unique())
+    if observed and observed.issubset(set(bool_like_values)):
+        df[col] = normalized.map(bool_like_values).astype("Float64")
+        encoding_map[col] = "Boolean-like text → 0/1"
+    else:
+        codes, _ = pd.factorize(col_as_text, sort=False)
+        df[col] = pd.Series(codes, index=df.index).replace(-1, np.nan).astype("Float64")
+        encoding_map[col] = "Label Encoding (Final numeric fallback)"
+
+# Pandas may create bool dummies; convert them to 0/1 integers.
+bool_cols_after_encoding = df.select_dtypes(include=["bool"]).columns.tolist()
+if bool_cols_after_encoding:
+    df[bool_cols_after_encoding] = df[bool_cols_after_encoding].astype("int8")
 
 # Display Encoding Decisions
 enc_df = pd.DataFrame([
@@ -2880,14 +2928,34 @@ for col in df.columns:
 df.drop_duplicates(inplace=True)
 df.reset_index(drop=True, inplace=True)
 
-# 4. Encode categoricals
-cat_cols = df.select_dtypes(include="object").columns
+# 4. Encode categoricals / booleans
+bool_cols = df.select_dtypes(include="bool").columns
+for col in bool_cols:
+    df[col] = df[col].astype(int)
+
+cat_cols = df.select_dtypes(include=["object", "category"]).columns
 for col in cat_cols:
     if df[col].nunique() <= {max_onehot_unique}:
         df = pd.get_dummies(df, columns=[col], drop_first=True)
     else:
         le = LabelEncoder()
         df[col] = le.fit_transform(df[col].astype(str))
+
+# Final ML-ready numeric enforcement (handles Y/N, True/False text, etc.)
+bool_like_map = {{
+    "true": 1, "false": 0, "yes": 1, "no": 0, "y": 1, "n": 0, "t": 1, "f": 0, "1": 1, "0": 0
+}}
+for col in df.columns:
+    if pd.api.types.is_bool_dtype(df[col]):
+        df[col] = df[col].astype(int)
+    elif not pd.api.types.is_numeric_dtype(df[col]):
+        normalized = df[col].astype(str).str.strip().str.lower()
+        unique_vals = set(normalized.dropna().unique())
+        if unique_vals and unique_vals.issubset(set(bool_like_map)):
+            df[col] = normalized.map(bool_like_map)
+        else:
+            codes, _ = pd.factorize(df[col], sort=False)
+            df[col] = pd.Series(codes).replace(-1, np.nan)
 
 # 5. Outliers — IQR cap
 for col in df.select_dtypes(include="number").columns:
@@ -2926,8 +2994,7 @@ st.download_button(
     mime="text/plain",
 )
 
-st.success("✅ Pipeline completed through Step 12 as configured.")
-st.stop()
+st.success("✅ Pipeline completed through Step 12. Proceeding to Step 13 model training.")
 
 # ─────────────────────────────────────────────────────────
 # STEP 13 — End-to-End Model Training, Evaluation & Tuning
@@ -3067,12 +3134,6 @@ else:
             f"**Detected problem type:** `{detected_problem_type.title()}`"
         )
 
-        ctrl_col1, ctrl_col2, ctrl_col3 = st.columns(3)
-        scaler_name = "StandardScaler"
-        ctrl_col1.metric("Feature scaler", "StandardScaler (train-fit only)")
-        ctrl_col2.metric("Configured CV folds", f"{model_cv_folds_cfg}")
-        ctrl_col3.metric("Configured tuning iterations", f"{model_tuning_iterations_cfg}")
-
         training_logs = []
         training_box = st.empty()
 
@@ -3107,6 +3168,18 @@ else:
                 f"{missing_summary['imputed_numeric_cols']}, categorical(mode): {missing_summary['imputed_categorical_cols']}."
             )
 
+        scaler_name = choose_scaler_name(X_train_model)
+        scaler_reason = (
+            "Numeric features are strongly skewed; MinMaxScaler is used for stable bounded scaling."
+            if scaler_name == "MinMaxScaler"
+            else "Numeric features are near-normal overall; StandardScaler is used."
+        )
+        ctrl_col1, ctrl_col2, ctrl_col3 = st.columns(3)
+        ctrl_col1.metric("Feature scaler", f"{scaler_name} (train-fit only)")
+        ctrl_col2.metric("Configured CV folds", f"{model_cv_folds_cfg}")
+        ctrl_col3.metric("Configured tuning iterations", f"{model_tuning_iterations_cfg}")
+        st.caption(f"Scaler decision: {scaler_reason}")
+
         m1, m2, m3 = st.columns(3)
         m1.metric("Train samples", f"{len(X_train_model):,}")
         m2.metric("Test samples", f"{len(X_test_model):,}")
@@ -3125,15 +3198,16 @@ else:
             max_count = y_train_model.value_counts().max()
             imbalance_ratio = min_count / max_count if max_count else 1.0
             use_smote = imbalance_ratio < 0.60 and min_count >= 2
+            st.metric("Imbalance ratio (minority/majority)", f"{imbalance_ratio:.3f}")
 
             if use_smote and IMBLEARN_AVAILABLE:
                 st.success(
-                    "✅ Imbalance detected. SMOTE will be applied only inside the model-training pipeline on TRAIN data."
+                    "✅ Imbalance detected. SMOTE will be applied ONLY on training folds inside the training pipeline."
                 )
             elif use_smote and not IMBLEARN_AVAILABLE:
                 st.warning("⚠️ Imbalance detected, but `imbalanced-learn` is not installed, so SMOTE is skipped.")
             else:
-                st.info("ℹ️ Class imbalance is not significant; SMOTE is not needed.")
+                st.info("ℹ️ Class imbalance is not significant, so SMOTE is skipped.")
             push_training_update(
                 "Class imbalance check completed. "
                 + ("SMOTE applied on train split." if use_smote and IMBLEARN_AVAILABLE else "Proceeding without SMOTE.")
@@ -3158,6 +3232,35 @@ else:
             push_training_update(f"Cross-validation configured with {cv_folds} folds.")
 
         model_registry = get_model_registry(detected_problem_type)
+        expected_cls = {
+            "Logistic Regression",
+            "Decision Tree Classifier",
+            "Random Forest Classifier",
+            "XGBoost Classifier",
+            "LightGBM Classifier",
+            "CatBoost Classifier",
+            "K-Nearest Neighbors (KNN)",
+            "Gradient Boosting Classifier",
+            "Extra Trees Classifier",
+        }
+        expected_reg = {
+            "Linear Regression",
+            "Ridge Regression",
+            "Lasso Regression",
+            "Random Forest Regressor",
+            "XGBoost Regressor",
+            "LightGBM Regressor",
+            "CatBoost Regressor",
+            "Gradient Boosting Regressor",
+            "Extra Trees Regressor",
+        }
+        expected_models = expected_cls if detected_problem_type == "classification" else expected_reg
+        missing_models = sorted(expected_models - set(model_registry.keys()))
+        if missing_models:
+            st.warning(
+                "⚠️ Some requested models are unavailable in this environment and were skipped: "
+                + ", ".join(missing_models)
+            )
         baseline_rows = []
         baseline_models = {}
         push_training_update("Training baseline models for leaderboard.")
@@ -3176,15 +3279,17 @@ else:
 
         baseline_df = pd.DataFrame(baseline_rows)
         if detected_problem_type == "classification":
-            baseline_df["RankScore"] = (
-                baseline_df["F1-score"].fillna(0)
-                + 0.20 * baseline_df["ROC-AUC"].fillna(0)
-                + 0.10 * baseline_df["Accuracy"].fillna(0)
-            )
-            baseline_df = baseline_df.sort_values(["RankScore", "F1-score"], ascending=False).reset_index(drop=True)
+            baseline_df = baseline_df.sort_values(
+                ["F1-score", "Recall", "Accuracy"],
+                ascending=False,
+            ).reset_index(drop=True)
+            baseline_df["Ranking Reason"] = "Ranked by F1 Score, then Recall, then Accuracy."
         else:
-            baseline_df["RankScore"] = -baseline_df["RMSE"]
-            baseline_df = baseline_df.sort_values(["RMSE", "MAE"], ascending=True).reset_index(drop=True)
+            baseline_df = baseline_df.sort_values(
+                ["R2", "RMSE", "MAE"],
+                ascending=[False, True, True],
+            ).reset_index(drop=True)
+            baseline_df["Ranking Reason"] = "Ranked by R², then lower RMSE, then lower MAE."
 
         st.markdown("#### Model Comparison (Baseline on Test Split)")
         st.dataframe(baseline_df, use_container_width=True)
@@ -3194,7 +3299,7 @@ else:
         push_training_update(f"Baseline comparison done. Top models: {', '.join(top_models)}.")
 
         cv_rows = []
-        cv_scoring = "f1_weighted" if detected_problem_type == "classification" else "neg_root_mean_squared_error"
+        cv_scoring = "f1_weighted" if detected_problem_type == "classification" else "r2"
         if cv_enabled:
             push_training_update("Running cross-validation on top 3 models.")
             for model_name in top_models:
@@ -3219,12 +3324,7 @@ else:
                     )
                 else:
                     cv_rows.append(
-                        {
-                            "Model": model_name,
-                            "CV folds": cv_folds,
-                            "CV Score (RMSE mean)": -cv_scores.mean(),
-                            "CV Std": cv_scores.std(),
-                        }
+                        {"Model": model_name, "CV folds": cv_folds, "CV Score (R2 mean)": cv_scores.mean(), "CV Std": cv_scores.std()}
                     )
             push_training_update("Cross-validation completed for top models.")
         else:
@@ -3233,7 +3333,7 @@ else:
                     {
                         "Model": model_name,
                         "CV folds": "N/A",
-                        "CV Score (f1_weighted mean)" if detected_problem_type == "classification" else "CV Score (RMSE mean)": np.nan,
+                        "CV Score (f1_weighted mean)" if detected_problem_type == "classification" else "CV Score (R2 mean)": np.nan,
                         "CV Std": np.nan,
                     }
                 )
@@ -3244,23 +3344,13 @@ else:
 
         tuned_models = {}
         tuning_rows = []
-        tuning_epoch_history = []
-        tuning_scoring = "f1_weighted" if detected_problem_type == "classification" else "neg_root_mean_squared_error"
-        planned_tuning_epochs = sum(
-            min(max_tuning_iterations, get_search_space_size(model_registry[m]["params"]))
-            for m in top_models
-            if model_registry[m]["params"] and cv_enabled
-        )
-        completed_tuning_epochs = 0
+        tuning_scoring = "f1_weighted" if detected_problem_type == "classification" else "r2"
+        cv_for_tuning = min(5, cv_folds) if cv_enabled else 0
+        if cv_for_tuning and cv_for_tuning != 5:
+            st.warning(f"⚠️ Requested cv=5 for tuning, but data supports up to cv={cv_for_tuning}.")
 
-        push_training_update(f"Starting hyperparameter tuning (max iterations per model: {max_tuning_iterations}).")
-        if planned_tuning_epochs > 0:
-            tuning_progress = st.progress(
-                0.0,
-                text=f"Hyperparameter tuning epochs: 0/{planned_tuning_epochs}",
-            )
-        else:
-            tuning_progress = None
+        push_training_update(f"Starting hyperparameter tuning with RandomizedSearchCV (target cv={5}).")
+        tuning_progress = st.progress(0.0, text=f"Tuned models: 0/{len(top_models)}")
         for idx, model_name in enumerate(top_models, start=1):
             cfg = model_registry[model_name]
             tune_pipeline = build_model_pipeline(
@@ -3271,139 +3361,50 @@ else:
             )
             param_dist = cfg["params"]
             push_training_update(f"Tuning {model_name} ({idx}/{len(top_models)}).")
-            if not param_dist or not cv_enabled:
+            if not param_dist or not cv_for_tuning:
                 tune_pipeline.fit(X_train_model, y_train_model)
-                tuned_models[model_name] = {
-                    "estimator": tune_pipeline,
-                    "best_score": np.nan,
-                    "best_params": {},
-                }
+                tuned_models[model_name] = {"estimator": tune_pipeline, "best_score": np.nan, "best_params": {}}
                 tuning_rows.append(
                     {
                         "Model": model_name,
-                        "Training Score": tune_pipeline.score(X_train_model, y_train_model),
+                        "Search Method": "Direct fit (no tunable params/CV unavailable)",
                         "Iterations Used": 0,
                         "Validation Score (CV mean)": np.nan,
                         "Best Params": "{}",
                     }
                 )
-                push_training_update(f"{model_name} has no tunable search space or CV is disabled; fitted directly.")
-                continue
-
-            n_iter = min(max_tuning_iterations, get_search_space_size(param_dist))
-            best_score = -np.inf
-            best_params = {}
-            random_states = [42, 42 + idx]
-            sampled_params = []
-            for seed in random_states:
-                sampled_params.extend(list(ParameterSampler(param_dist, n_iter=n_iter, random_state=seed)))
-                if len(sampled_params) >= n_iter:
-                    break
-            sampled_params = sampled_params[:n_iter]
-
-            for epoch_idx, params in enumerate(sampled_params, start=1):
-                candidate_pipeline = build_model_pipeline(
-                    clone(cfg["estimator"]),
-                    scaler_name=scaler_name,
-                    use_scaler=cfg["use_scaler"],
-                    use_smote=use_smote and detected_problem_type == "classification",
-                )
-                candidate_pipeline.set_params(**params)
-                cv_scores = cross_val_score(
-                    candidate_pipeline,
-                    X_train_model,
-                    y_train_model,
-                    cv=cv_folds,
+            else:
+                n_iter = min(max_tuning_iterations, get_search_space_size(param_dist))
+                tuner = RandomizedSearchCV(
+                    estimator=tune_pipeline,
+                    param_distributions=param_dist,
+                    n_iter=n_iter,
                     scoring=tuning_scoring,
+                    cv=cv_for_tuning,
+                    random_state=42,
                     n_jobs=-1,
                 )
-                epoch_score = float(cv_scores.mean())
-                epoch_loss = score_to_loss(detected_problem_type, epoch_score)
-                is_best_epoch = epoch_score > best_score
-                if epoch_score > best_score:
-                    best_score = epoch_score
-                    best_params = params
-
-                tuning_epoch_history.append(
+                tuner.fit(X_train_model, y_train_model)
+                tuned_models[model_name] = {
+                    "estimator": tuner.best_estimator_,
+                    "best_score": float(tuner.best_score_),
+                    "best_params": tuner.best_params_,
+                }
+                tuning_rows.append(
                     {
                         "Model": model_name,
-                        "Epoch": epoch_idx,
-                        "CV Score": epoch_score,
-                        "Validation Loss": epoch_loss,
-                        "Best So Far": "Yes" if is_best_epoch else "No",
+                        "Search Method": "RandomizedSearchCV",
+                        "Iterations Used": n_iter,
+                        "Validation Score (CV mean)": float(tuner.best_score_),
+                        "Best Params": json.dumps(tuner.best_params_),
                     }
                 )
-
-                completed_tuning_epochs += 1
-                if tuning_progress is not None:
-                    tuning_progress.progress(
-                        completed_tuning_epochs / planned_tuning_epochs,
-                        text=(
-                            f"Hyperparameter tuning epochs: {completed_tuning_epochs}/{planned_tuning_epochs} "
-                            f"(current: {model_name} epoch {epoch_idx}/{n_iter})"
-                        ),
-                    )
-                push_training_update(
-                    f"{model_name} epoch {epoch_idx}/{n_iter} completed. "
-                    f"Current CV: {epoch_score:.4f} | Current loss: {epoch_loss:.4f} | Best CV: {best_score:.4f}"
-                )
-
-            best_pipeline = build_model_pipeline(
-                clone(cfg["estimator"]),
-                scaler_name=scaler_name,
-                use_scaler=cfg["use_scaler"],
-                use_smote=use_smote and detected_problem_type == "classification",
-            )
-            if best_params:
-                best_pipeline.set_params(**best_params)
-            best_pipeline.fit(X_train_model, y_train_model)
-            tuned_models[model_name] = {
-                "estimator": best_pipeline,
-                "best_score": best_score,
-                "best_params": best_params,
-            }
-            tuning_rows.append(
-                {
-                    "Model": model_name,
-                    "Training Score": best_pipeline.score(X_train_model, y_train_model),
-                    "Iterations Used": n_iter,
-                    "Validation Score (CV mean)": best_score,
-                    "Best Params": json.dumps(best_params),
-                }
-            )
-            push_training_update(
-                f"{model_name} tuned with {n_iter} epochs. Best CV score: {best_score:.4f}."
-            )
-        if tuning_progress is not None:
-            tuning_progress.progress(
-                1.0,
-                text=f"Hyperparameter tuning epochs: {planned_tuning_epochs}/{planned_tuning_epochs} (complete)",
-            )
+            tuning_progress.progress(idx / len(top_models), text=f"Tuned models: {idx}/{len(top_models)}")
+            push_training_update(f"{model_name} tuning completed.")
 
         tuning_df = pd.DataFrame(tuning_rows)
         st.markdown("#### Hyperparameter Tuning Results (Top 3)")
         st.dataframe(tuning_df, use_container_width=True)
-
-        st.markdown("#### Epoch-wise Loss Tracking")
-        if tuning_epoch_history:
-            tuning_epoch_df = pd.DataFrame(tuning_epoch_history)
-            fig, ax = plt.subplots(figsize=(9, 4.8))
-            sns.lineplot(
-                data=tuning_epoch_df,
-                x="Epoch",
-                y="Validation Loss",
-                hue="Model",
-                marker="o",
-                ax=ax,
-            )
-            ax.set_title("Validation Loss per Epoch (Hyperparameter Tuning)")
-            ax.set_ylabel("Loss (1 - F1 weighted)" if detected_problem_type == "classification" else "Loss (RMSE)")
-            ax.grid(alpha=0.3)
-            st.pyplot(fig)
-            with st.expander("View epoch-by-epoch scores and loss"):
-                st.dataframe(tuning_epoch_df, use_container_width=True)
-        else:
-            st.info("ℹ️ No epoch history available (no tunable search space or CV disabled).")
 
         final_rows = []
         push_training_update("Evaluating tuned models on the holdout test set.")
@@ -3414,18 +3415,42 @@ else:
 
         final_df = pd.DataFrame(final_rows)
         if detected_problem_type == "classification":
-            final_df["RankScore"] = (
-                final_df["F1-score"].fillna(0)
-                + 0.20 * final_df["ROC-AUC"].fillna(0)
-                + 0.10 * final_df["Accuracy"].fillna(0)
-            )
-            final_df = final_df.sort_values(["RankScore", "F1-score"], ascending=False).reset_index(drop=True)
+            final_df = final_df.sort_values(
+                ["F1-score", "Recall", "Accuracy"],
+                ascending=False,
+            ).reset_index(drop=True)
+            final_df["Ranking Reason"] = "Ranked by F1 Score, then Recall, then Accuracy."
         else:
-            final_df["RankScore"] = -final_df["RMSE"]
-            final_df = final_df.sort_values(["RMSE", "MAE"], ascending=True).reset_index(drop=True)
+            final_df = final_df.sort_values(
+                ["R2", "RMSE", "MAE"],
+                ascending=[False, True, True],
+            ).reset_index(drop=True)
+            final_df["Ranking Reason"] = "Ranked by R², then lower RMSE, then lower MAE."
 
         st.markdown("#### Final Evaluation on Test Data (Tuned Models)")
         st.dataframe(final_df, use_container_width=True)
+
+        before_after = baseline_df[["Model"]].merge(
+            baseline_df[
+                ["Model", "Accuracy", "Precision", "Recall", "F1-score"]
+                if detected_problem_type == "classification"
+                else ["Model", "RMSE", "MAE", "R2"]
+            ],
+            on="Model",
+            how="left",
+            suffixes=("", "_Before"),
+        ).merge(
+            final_df[
+                ["Model", "Accuracy", "Precision", "Recall", "F1-score"]
+                if detected_problem_type == "classification"
+                else ["Model", "RMSE", "MAE", "R2"]
+            ],
+            on="Model",
+            how="inner",
+            suffixes=("_Before", "_After"),
+        )
+        st.markdown("#### Before vs After Tuning (Top 3)")
+        st.dataframe(before_after, use_container_width=True)
 
         best_model_name = final_df.iloc[0]["Model"]
         best_model = tuned_models[best_model_name]["estimator"]
@@ -3435,13 +3460,13 @@ else:
         st.markdown("#### Training vs Validation Performance")
         best_tuning_row = tuning_df[tuning_df["Model"] == best_model_name].iloc[0]
         perf_col1, perf_col2 = st.columns(2)
-        perf_col1.metric("Training Score", f"{best_tuning_row['Training Score']:.4f}")
+        perf_col1.metric("Training Score", f"{best_model.score(X_train_model, y_train_model):.4f}")
         if pd.isna(best_tuning_row["Validation Score (CV mean)"]):
             perf_col2.metric("Validation Score (CV mean)", "N/A")
         else:
             perf_col2.metric("Validation Score (CV mean)", f"{best_tuning_row['Validation Score (CV mean)']:.4f}")
 
-        lc_scoring = "f1_weighted" if detected_problem_type == "classification" else "neg_root_mean_squared_error"
+        lc_scoring = "f1_weighted" if detected_problem_type == "classification" else "r2"
         if cv_enabled:
             train_sizes, train_scores, val_scores = learning_curve(
                 best_model,
@@ -3454,16 +3479,13 @@ else:
             )
             train_curve = train_scores.mean(axis=1)
             val_curve = val_scores.mean(axis=1)
-            if detected_problem_type == "regression":
-                train_curve = -train_curve
-                val_curve = -val_curve
 
             fig, ax = plt.subplots(figsize=(8, 4.5))
             ax.plot(train_sizes, train_curve, marker="o", label="Training")
             ax.plot(train_sizes, val_curve, marker="o", label="Validation")
             ax.set_title(f"Learning Curve — {best_model_name}")
             ax.set_xlabel("Training Samples")
-            ax.set_ylabel("Score" if detected_problem_type == "classification" else "RMSE")
+            ax.set_ylabel("Score")
             ax.legend()
             ax.grid(alpha=0.3)
             st.pyplot(fig)
@@ -3519,6 +3541,41 @@ else:
 **Final test metrics:** `{best_metrics}`  
 **Selection rationale:** Highest test performance among tuned models with stronger train/validation consistency.
 """
+        )
+
+        baseline_best_name = baseline_df.iloc[0]["Model"] if not baseline_df.empty else best_model_name
+        baseline_best_model = baseline_models.get(baseline_best_name, best_model)
+        model_scaler = None
+        if hasattr(best_model, "named_steps") and "scaler" in best_model.named_steps:
+            model_scaler = best_model.named_steps["scaler"]
+
+        model_comparison_csv = final_df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "⬇️ Download model_comparison.csv",
+            data=model_comparison_csv,
+            file_name="model_comparison.csv",
+            mime="text/csv",
+        )
+
+        st.download_button(
+            "⬇️ Download trained_model.pkl",
+            data=pickle.dumps(baseline_best_model),
+            file_name="trained_model.pkl",
+            mime="application/octet-stream",
+        )
+        st.download_button(
+            "⬇️ Download tuned_model.pkl",
+            data=pickle.dumps(best_model),
+            file_name="tuned_model.pkl",
+            mime="application/octet-stream",
+        )
+        st.download_button(
+            "⬇️ Download scaler.pkl",
+            data=pickle.dumps(model_scaler),
+            file_name="scaler.pkl",
+            mime="application/octet-stream",
+            disabled=model_scaler is None,
+            help="Available when the selected best model includes a scaler step.",
         )
 
 # ─────────────────────────────────────────────────────────

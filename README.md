@@ -312,7 +312,6 @@ After preprocessing:
 - Random Forest
 - Decision Tree
 - XGBoost
-- SVM
 
 ## Regression Models
 

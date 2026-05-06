@@ -8,3 +8,6 @@ scipy
 python-dotenv 
 openai 
 tabulate
+catboost 
+xgboost
+lightgbm

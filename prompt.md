@@ -274,11 +274,27 @@ IMPORTANT RULES:
 Dataset:
 <PASTE YOUR DATASET / FILE / DESCRIPTION HERE>
 
-ValueError: This app has encountered an error. The original error message is redacted to prevent data leaks. Full error details have been recorded in the logs (if you're on Streamlit Cloud, click on 'Manage app' in the lower right of your app).
-Traceback:
-File "/mount/src/eda_feature_engineering_autoanted_with_ai_detailed_explanation/app.py", line 2260, in <module>
-np.fill_diagonal(corr_abs.values, np.nan)
-~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
-File "/home/adminuser/venv/lib/python3.14/site-packages/numpy/lib/\_index_tricks_impl.py", line 923, in fill_diagonal
-a.flat[:end:step] = val
-~~~~~~^^^^^^^^^^^
+
+Algorithm	Best Use Case
+Logistic Regression	Simple baseline classification
+Decision Tree	Rule-based learning
+Random Forest	High accuracy + robust
+XGBoost	Advanced boosting
+LightGBM	Fast boosting
+CatBoost	Excellent for categorical features
+KNN	Distance-based classification
+Naive Bayes	Text/small datasets
+AdaBoost	Boosting ensemble
+Extra Trees	Randomized trees
+Gradient Boosting	Sequential boosting
+
+inear Regression	Simple numerical prediction
+Ridge Regression	Prevent overfitting
+Lasso Regression	Feature selection
+ElasticNet	Combined regularization
+Decision Tree Regressor	Nonlinear patterns
+Random Forest Regressor	Strong ensemble
+XGBoost Regressor	High-performance boosting
+LightGBM Regressor	Fast large datasets
+CatBoost Regressor	Categorical-heavy datasets
+KNN Regressor	Distance-based regression
