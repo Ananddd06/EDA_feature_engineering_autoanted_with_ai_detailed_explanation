@@ -4,7 +4,7 @@
 [![Streamlit](https://img.shields.io/badge/Built%20with-Streamlit-ff4b4b.svg)](#run-the-app)
 [![OpenRouter](https://img.shields.io/badge/AI-OpenRouter-6f42c1.svg)](#detailed-implementation-openrouter-ai-explanations)
 
-Interactive Streamlit app for end-to-end tabular data preprocessing with optional AI explanations powered by OpenRouter.
+
 
 Upload a CSV and get:
 
