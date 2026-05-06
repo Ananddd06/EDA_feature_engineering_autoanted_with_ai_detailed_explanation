@@ -273,3 +273,12 @@ IMPORTANT RULES:
 
 Dataset:
 <PASTE YOUR DATASET / FILE / DESCRIPTION HERE>
+
+ValueError: This app has encountered an error. The original error message is redacted to prevent data leaks. Full error details have been recorded in the logs (if you're on Streamlit Cloud, click on 'Manage app' in the lower right of your app).
+Traceback:
+File "/mount/src/eda_feature_engineering_autoanted_with_ai_detailed_explanation/app.py", line 2260, in <module>
+np.fill_diagonal(corr_abs.values, np.nan)
+~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/adminuser/venv/lib/python3.14/site-packages/numpy/lib/\_index_tricks_impl.py", line 923, in fill_diagonal
+a.flat[:end:step] = val
+~~~~~~^^^^^^^^^^^

@@ -1,314 +1,541 @@
-# ML Preprocessing Agent
+# 🚀 AI-Powered Automated EDA, Feature Engineering & ML Pipeline Agent
 
-[![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](#installation)
-[![Streamlit](https://img.shields.io/badge/Built%20with-Streamlit-ff4b4b.svg)](#run-the-app)
-[![OpenRouter](https://img.shields.io/badge/AI-OpenRouter-6f42c1.svg)](#detailed-implementation-openrouter-ai-explanations)
+<div align="center">
 
+![Python](https://img.shields.io/badge/Python-3.9+-blue)
+![Streamlit](https://img.shields.io/badge/Streamlit-ML_App-red)
+![Scikit-Learn](https://img.shields.io/badge/Scikit--Learn-ML-orange)
+![OpenRouter](https://img.shields.io/badge/OpenRouter-AI-green)
+![License](https://img.shields.io/badge/License-MIT-purple)
 
-
-Upload a CSV and get:
-
-- full preprocessing pipeline execution
-- visual diagnostics at each stage
-- downloadable cleaned dataset
-- downloadable reproducible Python script
-- AI commentary for interview-style understanding
+</div>
 
 ---
 
-## Table of contents
+# 📌 Project Overview
 
-- [Key features](#key-features)
-- [Project structure](#project-structure)
-- [Tech stack](#tech-stack)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Run the app](#run-the-app)
-- [Pipeline walkthrough](#pipeline-walkthrough)
-- [Detailed implementation: OpenRouter AI explanations](#detailed-implementation-openrouter-ai-explanations)
-- [Outputs](#outputs)
-- [Troubleshooting](#troubleshooting)
-- [Development notes](#development-notes)
-- [License](#license)
+## 🧠 Intelligent AI-Driven Machine Learning Preprocessing System
 
----
+This project is an advanced AI-powered machine learning preprocessing and exploratory data analysis platform that automates the complete data preparation workflow using:
 
-## Key features
+- Artificial Intelligence
+- Automated EDA
+- Feature Engineering
+- Feature Selection
+- Data Cleaning
+- Model Training
+- Hyperparameter Tuning
+- Explainable AI
 
-- CSV-driven workflow for quick preprocessing
-- Smart missing-value handling options
-- Duplicate detection/removal
-- Univariate + multivariate visual analysis
-- Outlier treatment (IQR / Z-score + cap/remove logic)
-- Categorical encoding strategies
-- Model-training-aware preprocessing guidance (scaling deferred to training)
-- Feature engineering and correlated-feature removal
-- Target-aware split with stratification fallback where possible
-- End-to-end post-cleaning model training, evaluation, cross-validation, and tuning
-- User-adjustable model validation controls (CV folds and tuning iterations)
-- OpenRouter-based AI explanations and auto-configuration support
+The system is designed to intelligently analyze uploaded datasets and automatically determine:
+
+- Whether the problem is:
+  - Classification
+  - Regression
+  - Unsupervised Learning
+- Which preprocessing techniques should be applied
+- Which feature engineering strategies are suitable
+- Which machine learning workflow should be executed
+
+The project combines deterministic preprocessing pipelines with AI-generated reasoning and explanations using OpenRouter APIs.
 
 ---
 
-## Project structure
+# 🎯 Problem Statement
+
+In real-world machine learning projects, data preprocessing and exploratory data analysis consume nearly 70–80% of the development lifecycle.
+
+Traditional preprocessing workflows suffer from several limitations:
+
+- Manual EDA consumes significant time
+- Choosing preprocessing techniques requires domain expertise
+- Feature engineering is difficult for beginners
+- Identifying the ML problem type is not always straightforward
+- Data cleaning pipelines are repetitive
+- Lack of explainability in preprocessing decisions
+- Reproducibility challenges
+
+This project solves these problems by creating an intelligent automated preprocessing ecosystem capable of:
+
+✅ Understanding datasets automatically  
+✅ Identifying ML problem type  
+✅ Performing dynamic preprocessing  
+✅ Executing AI-assisted EDA  
+✅ Applying adaptive feature engineering  
+✅ Training models automatically  
+✅ Explaining every major step using AI
+
+---
+
+# 💡 Core Idea of the Project
+
+The user uploads a dataset and provides:
+
+- Dataset description
+- Problem statement
+- Business objective
+
+The AI engine analyzes:
+
+- Dataset structure
+- Feature distributions
+- Target column characteristics
+- Data types
+- Missing values
+- Cardinality
+- Statistical properties
+
+Then the system automatically decides:
+
+| Dataset Condition         | AI Decision                    |
+| ------------------------- | ------------------------------ |
+| Categorical Target        | Classification Pipeline        |
+| Continuous Numeric Target | Regression Pipeline            |
+| No Target Column          | Unsupervised Learning Pipeline |
+
+Based on this decision, the application dynamically modifies:
+
+- EDA workflow
+- Feature engineering logic
+- Encoding strategy
+- Scaling strategy
+- Model selection
+- Evaluation metrics
+
+---
+
+# 🧠 AI-Powered Dynamic Workflow
+
+# 📊 Intelligent Problem Type Detection
+
+The AI automatically classifies the dataset into:
+
+## ✅ Classification
+
+Detected when:
+
+- Target column contains categories/classes
+- Binary labels
+- Multi-class labels
+
+Examples:
+
+- Spam Detection
+- Disease Prediction
+- Loan Approval
+- Fraud Detection
+
+### Workflow Activated
+
+- Class distribution analysis
+- Imbalance detection
+- SMOTE recommendation
+- Label encoding
+- Classification algorithms
+- Precision / Recall / F1 evaluation
+
+---
+
+## ✅ Regression
+
+Detected when:
+
+- Target variable is continuous numerical
+
+Examples:
+
+- House Price Prediction
+- Sales Forecasting
+- Stock Prediction
+
+### Workflow Activated
+
+- Outlier sensitivity analysis
+- Distribution analysis
+- Skewness correction
+- Scaling strategies
+- Regression models
+- RMSE / MAE / R² evaluation
+
+---
+
+## ✅ Unsupervised Learning
+
+Detected when:
+
+- No target column exists
+- User selects clustering/unsupervised mode
+
+Examples:
+
+- Customer Segmentation
+- Pattern Discovery
+- Market Basket Analysis
+
+### Workflow Activated
+
+- PCA
+- Clustering preparation
+- Dimensionality reduction
+- Correlation structure analysis
+- Anomaly detection
+
+---
+
+# ⚡ End-to-End Pipeline Architecture
+
+```text
+User Uploads CSV Dataset
+            ↓
+Dataset Description + Problem Statement
+            ↓
+AI Dataset Understanding
+            ↓
+Automatic Problem Type Detection
+            ↓
+Dynamic EDA Pipeline Generation
+            ↓
+Missing Value Handling
+            ↓
+Duplicate Detection & Removal
+            ↓
+Outlier Detection & Treatment
+            ↓
+Feature Engineering
+            ↓
+Feature Selection
+            ↓
+Encoding & Transformation
+            ↓
+Train/Test Split
+            ↓
+Model Training
+            ↓
+Cross Validation
+            ↓
+Hyperparameter Tuning
+            ↓
+Evaluation & Visualization
+            ↓
+Export Cleaned Dataset + Python Script
+```
+
+````
+
+---
+
+# 🔥 Major Features
+
+# 📊 Automated Exploratory Data Analysis (EDA)
+
+The application automatically performs:
+
+## Univariate Analysis
+
+- Histograms
+- KDE plots
+- Count plots
+- Box plots
+- Skewness analysis
+
+## Bivariate Analysis
+
+- Scatter plots
+- Feature-target relationships
+- Correlation studies
+
+## Multivariate Analysis
+
+- Correlation heatmaps
+- Pair plots
+- Feature interaction analysis
+
+---
+
+# 🧹 Intelligent Data Cleaning
+
+## Missing Value Handling
+
+Supported strategies:
+
+- Mean
+- Median
+- Mode
+- Drop rows
+- AI-recommended strategy
+
+## Duplicate Handling
+
+- Duplicate detection
+- Automatic removal
+
+## Outlier Treatment
+
+Methods:
+
+- IQR Method
+- Z-Score Method
+- Capping
+- Removal
+
+---
+
+# ⚙️ AI-Based Feature Engineering
+
+The system dynamically applies:
+
+## Encoding Strategies
+
+- Label Encoding
+- One-Hot Encoding
+- Frequency Encoding
+
+## Feature Transformations
+
+- Log transformation
+- Skewness correction
+- Scaling preparation
+
+## Feature Selection
+
+- Correlation threshold removal
+- Zero variance feature removal
+- Redundant feature elimination
+
+---
+
+# 🤖 Automated Machine Learning
+
+After preprocessing:
+
+## Classification Models
+
+- Logistic Regression
+- Random Forest
+- Decision Tree
+- XGBoost
+- SVM
+
+## Regression Models
+
+- Linear Regression
+- Random Forest Regressor
+- Gradient Boosting
+- XGBoost Regressor
+
+## Unsupervised Models
+
+- K-Means
+- DBSCAN
+- PCA
+
+---
+
+# 🧠 OpenRouter AI Integration
+
+This project integrates OpenRouter APIs to provide:
+
+- AI dataset explanations
+- AI preprocessing recommendations
+- Interview-style reasoning
+- Dynamic pipeline configuration
+- Intelligent workflow generation
+
+---
+
+# 🏗️ Technical Architecture
+
+## Frontend
+
+- Streamlit
+
+## Backend
+
+- Python
+
+## Data Processing
+
+- Pandas
+- NumPy
+
+## Machine Learning
+
+- Scikit-Learn
+- SciPy
+
+## Visualization
+
+- Matplotlib
+- Seaborn
+
+## AI Integration
+
+- OpenRouter
+- OpenAI SDK
+
+---
+
+# 📂 Project Structure
 
 ```text
 preprocessing_agent/
-├── preprocessing_agent.py   # Main app (recommended entrypoint)
-├── app.py                   # Alternate pipeline variant
-├── requirements.txt         # Python dependencies
-├── EDA_Visa_US.ipynb        # Notebook artifact
-└── README.md
+│
+├── preprocessing_agent.py
+├── app.py
+├── requirements.txt
+├── README.md
+├── .env
+└── datasets/
 ```
 
 ---
 
-## Tech stack
+# ⚙️ Installation
 
-- Python 3.9+
-- Streamlit
-- pandas, numpy
-- scikit-learn
-- scipy
-- matplotlib, seaborn
-- python-dotenv
-- OpenAI Python SDK (used against OpenRouter base URL)
+## Clone Repository
+
+```bash
+git clone <your-repository-url>
+cd preprocessing_agent
+```
 
 ---
 
-## Installation
+## Create Virtual Environment
 
 ```bash
-git clone <your-repo-url>
-cd preprocessing_agent
-python3 -m venv .venv
+python -m venv .venv
+```
+
+---
+
+## Activate Environment
+
+### Linux / Mac
+
+```bash
 source .venv/bin/activate
+```
+
+### Windows
+
+```bash
+.venv\Scripts\activate
+```
+
+---
+
+## Install Dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
 ---
 
-## Configuration
+# 🔑 Environment Configuration
 
-AI explanations are optional. Core preprocessing runs locally regardless.
-
-Create `.env` in project root:
+Create a `.env` file:
 
 ```env
-OPENROUTER_API_KEY=your_openrouter_api_key
+OPENROUTER_API_KEY=your_api_key
 OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 ```
 
-If `OPENROUTER_API_KEY` is missing, AI sections return a friendly warning string and the app continues normally.
-
 ---
 
-## Run the app
-
-Recommended:
+# ▶️ Run the Application
 
 ```bash
 streamlit run preprocessing_agent.py
 ```
 
-> `preprocessing_agent.py` includes the full pipeline with end-to-end model training.
+---
 
-Alternate:
+# 📈 Output Generated
 
-```bash
-streamlit run app.py
+The system provides:
+
+✅ Cleaned Dataset
+✅ Downloadable CSV
+✅ Generated Python Script
+✅ Visual Diagnostics
+✅ AI Explanations
+✅ Model Evaluation Reports
+✅ Feature Engineering Insights
+✅ Correlation Reports
+
+---
+
+# 🧠 Why This Project Is Unique
+
+Unlike traditional preprocessing systems, this project:
+
+✅ Dynamically changes workflow based on ML problem type
+✅ Uses AI to explain preprocessing decisions
+✅ Automates feature engineering
+✅ Provides interview-level ML explanations
+✅ Combines deterministic ML with Generative AI
+✅ Supports classification, regression, and unsupervised learning
+✅ Generates reproducible preprocessing scripts
+
+---
+
+# 🎓 Educational Value
+
+This project is highly valuable for:
+
+- Data Science Students
+- Machine Learning Engineers
+- AI Researchers
+- Beginners learning EDA
+- Interview Preparation
+- Academic Projects
+- Portfolio Development
+
+---
+
+# 📌 Future Improvements
+
+- AutoML integration
+- Deep Learning support
+- Time series preprocessing
+- NLP preprocessing pipelines
+- LLM-powered feature synthesis
+- Real-time dashboard analytics
+- Cloud deployment support
+
+---
+
+# 🏆 Resume Description
+
+Developed an AI-powered automated machine learning preprocessing and exploratory data analysis platform capable of dynamically identifying machine learning problem types and performing adaptive EDA, feature engineering, preprocessing, model training, and AI-generated explanations using Streamlit, Scikit-Learn, and OpenRouter APIs.
+
+---
+
+# 📜 License
+
+MIT License
+
+---
+
+# ⭐ Support
+
+If you like this project:
+
+⭐ Star the repository
+🍴 Fork the project
+🧠 Contribute improvements
+
+---
+
+# 👨‍💻 Author
+
+J Anand
+
+---
+
 ```
 
-> `app.py` is a preprocessing-focused variant and does not include the model training stage.
-
-Open the URL shown by Streamlit (typically `http://localhost:8501`).
-
----
-
-## Pipeline walkthrough
-
-The primary app (`preprocessing_agent.py`) executes a rich preprocessing + EDA flow:
-
-1. **Data understanding**  
-   Shape, types, null counts, descriptive stats, and AI summary.
-
-2. **Target analysis (Step 1.5)**  
-   User selects target column; app shows class counts and problem-type hint (binary/multi-class/regression-like).
-
-3. **Missing value handling**  
-   Configurable strategy: auto/mean/median/mode/drop rows.
-
-4. **Duplicate removal**  
-   Detects and removes exact row duplicates.
-
-5. **Univariate analysis**  
-   Histograms/distributions/skewness style insights.
-
-6. **Bivariate & multivariate analysis**  
-   Correlation heatmap, scatter/pair plots, categorical interactions.
-
-7. **Feature transformation**  
-   Skew handling (log-style transformations) and categorical encoding strategy.
-
-8. **Feature engineering**  
-   Correlation diagnostics and zero-variance feature checks.
-
-9. **Feature selection**  
-   Drops highly correlated features above threshold.
-
-10. **Train/test split + export**  
-     Stratified split when target allows; otherwise random split. Exports cleaned CSV + generated Python script.
-
-11. **Post-cleaning model development**  
-    Automatically detects classification/regression, runs multi-model training, CV, hyperparameter tuning, and final test-set evaluation with diagnostics.
-
----
-
-## Detailed implementation: OpenRouter AI explanations
-
-This section describes exactly how your AI explanation layer is implemented.
-
-### 1) Environment + client bootstrapping
-
-In `preprocessing_agent.py`, you load env vars and initialize an OpenAI-compatible client pointing to OpenRouter:
-
-```python
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
-client = OpenAI(
-    api_key=OPENROUTER_API_KEY or "placeholder",
-    base_url=OPENROUTER_BASE_URL,
-)
-AI_ENABLED = bool(OPENROUTER_API_KEY)
 ```
-
-Key idea: same OpenAI SDK, but `base_url` routes requests to OpenRouter.
-
-### 2) Central AI wrapper (`ask_deepseek`)
-
-All AI calls go through one helper:
-
-```python
-def ask_deepseek(system: str, user: str, max_tokens: int = 1500) -> str:
-    if not AI_ENABLED:
-        return "⚠️ Set `OPENROUTER_API_KEY` in your environment to enable AI commentary."
-    try:
-        resp = client.chat.completions.create(
-            model="z-ai/glm-4.5-air:free",
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            max_tokens=max_tokens,
-        )
-        return resp.choices[0].message.content.strip()
-    except Exception as exc:
-        return f"⚠️ OpenRouter error: {exc}"
-```
-
-Design benefits:
-
-- one model/config control point
-- graceful fallback when API key is missing
-- explicit error surfacing in UI if request fails
-
-### 3) Prompt strategy across the pipeline
-
-You use task-specific prompts at each major step:
-
-- step summaries (data understanding, missing values, deduplication, etc.)
-- interview-focused bullet-point explanations
-- concise, role-driven system prompts (e.g., “You are a senior ML engineer…”)
-
-You pass structured context (`pretty_json(...)`, counts, shapes, config choices) so responses remain grounded in actual dataset state.
-
-### 4) AI auto-configuration flow
-
-`preprocessing_agent.py` includes an AI-driven parameter recommendation phase that:
-
-- builds a compact dataset summary (`shape`, type counts, missing stats, unique counts)
-- requests a strict JSON response with required keys:
-  - `missing_strategy`
-  - `outlier_method`
-  - `outlier_action`
-  - `z_threshold`
-  - `iqr_factor`
-  - `encoding_method`
-  - `test_size`
-  - `max_onehot_unique`
-  - `reasoning`
-- parses and writes values into `st.session_state`
-- reruns app with updated controls
-
-This gives users a guided “AI suggested config” before running the rest of the pipeline.
-
-### 5) Runtime fail-safe behavior
-
-Your implementation is robust in degraded AI conditions:
-
-- no API key → preprocessing still works, AI message is informative
-- API call exception → error string returned, app remains interactive
-- JSON parse failure during auto-config → warning shown and defaults preserved
-
-So AI is an enhancement layer, not a hard dependency.
-
-### 6) Why this architecture is good
-
-- clean separation: deterministic preprocessing vs narrative AI explanation
-- minimal coupling: one helper function mediates all model access
-- easy model swap: change only `model="..."` in one place
-- reproducible data processing remains local and transparent
-
----
-
-## Outputs
-
-After each run, the app can provide:
-
-- transformed dataset preview
-- cleaned CSV download
-- generated Python preprocessing script download
-- per-step visualizations (distributions, correlations, class plots, etc.)
-- AI commentary blocks and final summary
-
----
-
-## Troubleshooting
-
-### `streamlit: command not found`
-
-Activate venv and reinstall:
-
-```bash
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-### AI explanation not appearing
-
-- Verify `OPENROUTER_API_KEY`
-- Verify network connectivity
-- Verify model access/credits on OpenRouter
-
-### Dependency issues
-
-```bash
-pip install --upgrade pip
-pip install -r requirements.txt
-```
-
----
-
-## Development notes
-
-- Primary app is `preprocessing_agent.py`
-- Keep heavy preprocessing deterministic (pandas/scikit-learn)
-- Keep AI usage explainability-focused and optional
-- Update `requirements.txt` when adding/removing dependencies
-
----
-
-## License
-
-No `LICENSE` file is currently present.  
-Add one before public distribution.
+````
