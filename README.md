@@ -220,8 +220,6 @@ Evaluation & Visualization
 Export Cleaned Dataset + Python Script
 ```
 
-````
-
 ---
 
 # 🔥 Major Features
@@ -534,8 +532,3 @@ If you like this project:
 J Anand
 
 ---
-
-```
-
-```
-````
